@@ -1,0 +1,1322 @@
+Neste trabalho faremos uma análise exploratória e relatório dos dados de um dataset do patch de atualização 13.13 do jogo League of Legends, com o objetivo de verificar os dez personagens (campeões) mais vezes selecionados (picked) pelos jogadores em cada rota (role ou lane) em que atuam, relacionando sua taxa de seleção na fila ranqueada (partidas competitivas online) com suas taxas de vitórias, seus status como: KDA (Kills/ Deaths/ Assistances) ao longo do patch.
+
+Para começar nossa análise de dados, primeiro foi procurado o dataset do patch de atualização no site Kaggle, onde o mais recente encontrado foi data set do patch 13.13 referente a temporada 13 do jogo. A base de dados contém cem amostras (linhas) e dez variáveis (colunas), atendendo, assim, o critério do projeto.
+
+Também serão utilizados a linguagem R e o R Studio como ferramentas de nossa análise para nos trazer maior precisão na aplicação.
+
+Após feito o download do arquivo no formato “.csv” e criarmos o projeto no R Studio, fizemos sua importação para a aplicação que estamos montando.
+
+Analisando a estrutura dos dados, foi notado logo que o arquivo possuía o delimitador de colunas com “;”, assim fazendo-se necessário o uso de uma expressão no R para conseguirmos ler o documento sem que o mesmo apresente problemas de leitura no momento que precisarmos ler os dados e retorná-los com alguns valores de consulta.
+
+“dados\<-read.csv("C:/Users/user/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv", sep = ";")”
+
+Continuando a análise da estrutura dos dados quanto a verificação de erros e problemas nos dados, não foi detectado nenhum erro de leitura após o uso da função descrita acima. Também não foi detectado nenhum erro de digitação, que poderia causar erros na criação de tabelas e cálculos posteriores.
+
+A princípio foi notado uma duplicação no nome de alguns campeões, porém, essa duplicação está correta, pois, em alguns casos, no jogo diversos campeões são criados pensando em uma rota específica, mas são utilizados em mais de uma, como é o caso da campeã Akali, por exemplo.
+
+---
+title: "EstruturaDosDados"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: '2'
+  word_document:
+    reference_docx: caminho/para/seu/modelo.docx
+    toc: true
+    toc_depth: 2
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Carregar os pacotes necessários
+library(dplyr)
+
+```
+
+```{r}
+# Ler os dados do dataset
+dados <- read.csv("C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv", sep = ";")
+
+```
+
+```{r}
+# Contar a frequência de cada campeão
+campeoes_frequencia <- dados %>%
+  group_by(Name) %>%
+  summarise(Frequencia = n()) %>%
+  filter(Frequencia >= 2)
+
+# Exibir os campeões que aparecem duas ou mais vezes
+print(campeoes_frequencia)
+
+```
+
+Criamos também uma função para verificação de valores ausentes no dataset, e, após a execução da função, não fora detectado nenhuma amostra ou variável com valores ausentes.
+
+Como não houve valores ausentes não foi necessário fazer o tratamento da falta de dados no projeto.
+
+---
+title: "Verificação de Valores Ausentes"
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Ler os dados do dataset com a codificação correta
+dados <- read.csv("C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv", sep = ";", fileEncoding = "UTF-8")
+
+# Converter colunas com porcentagens para valores numéricos
+dados$Win.. <- as.numeric(gsub("%", "", dados$Win..)) / 100
+dados$Role.. <- as.numeric(gsub("%", "", dados$Role..)) / 100
+dados$Pick.. <- as.numeric(gsub("%", "", dados$Pick..)) / 100
+dados$Ban.. <- as.numeric(gsub("%", "", dados$Ban..)) / 100
+```
+
+```{r}
+# Verificar valores ausentes
+valores_ausentes <- colSums(is.na(dados))
+valores_ausentes
+```
+
+```{r}
+# Visualização de valores ausentes
+library(ggplot2)
+library(tidyr)
+
+# Converter os dados para formato longo
+dados_long <- dados %>%
+  mutate(across(everything(), ~ifelse(is.na(.), "Ausente", "Presente"))) %>%
+  pivot_longer(everything(), names_to = "Variável", values_to = "Presença")
+
+# Criar o gráfico
+ggplot(dados_long, aes(x = Variável, fill = Presença)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proporção de Valores Ausentes por Variável",
+       x = "Variável",
+       y = "Proporção") +
+  scale_fill_manual(values = c("Presente" = "blue", "Ausente" = "red")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Seguindo nos objetivos do projeto, foram feitas análises das variáveis quanto a: estatística de tendência central, estatística de ordem, variação dos dados e transformações dos dados conforme os tipos das variáveis.
+
+Primeiro, como mencionado no começo do relatório, fizemos uma análise de todos os mais de 100 campeões presentes no jogo e separamos os dez mais selecionados pelos jogadores na fila ranqueada no patch 13.13 em cada rota (role). Essa tabela pode ser visualizada seguindo as imagens neste relatório.
+
+----- ESPAÇO PARA OS PRINTS
+
+Fazendo nossa primeira análise de variáveis, vamos trazer agora a tendência central dos dez campeões mais populares na role top, jungle, mid, adc e support de forma parecida. Primeiro vamos a leitura e a preparação dos dados que serão utilizados no cálculo. Em seguida, fizemos a filtragem por role, começando do top e seguindo para jungle, mid, adc e support na mesma ordem. Depois, foi implementado uma função para que calcule a tendência central, calculando a média e mediana das métricas (Win, Role, Pick, Ban, KDA) para cada campeão), assim gerando um gráfico de barras exibindo todas essas informações.
+
+---
+title: "Análise de Tendência Central dos Campeões TOP"
+output: word_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# Ler os dados do dataset com a codificação correta
+dados <- read.csv("C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv", sep = ";", fileEncoding = "UTF-8")
+
+# Converter colunas com porcentagens para valores numéricos
+dados$Win.. <- as.numeric(gsub("%", "", dados$Win..)) / 100
+dados$Role.. <- as.numeric(gsub("%", "", dados$Role..)) / 100
+dados$Pick.. <- as.numeric(gsub("%", "", dados$Pick..)) / 100
+dados$Ban.. <- as.numeric(gsub("%", "", dados$Ban..)) / 100
+```
+
+```{r}
+# Filtrar dados para a role "TOP"
+top_dados <- dados %>%
+  filter(Role == "TOP") %>%
+  arrange(desc(Pick..)) %>%
+  head(10)
+
+# Resumir as estatísticas de tendência central
+tendencia_central <- top_dados %>%
+  select(Name, Win.., Role.., Pick.., Ban.., KDA) %>%
+  pivot_longer(cols = c(Win.., Role.., Pick.., Ban.., KDA), 
+               names_to = "Métrica", 
+               values_to = "Valor") %>%
+  group_by(Name, Métrica) %>%
+  summarise(Media = mean(Valor, na.rm = TRUE),
+            Mediana = median(Valor, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Media, Mediana), 
+               names_to = "Estatística", 
+               values_to = "Valor") 
+
+# Criar o gráfico com as métricas médias e medianas para os 10 campeões TOP mais pickados
+ggplot(tendencia_central, aes(x = Name, y = Valor, fill = Estatística)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~ Métrica, scales = "free_y") +
+  labs(title = "Tendência Central dos 10 Campeões TOP mais Pickados",
+       x = "Campeão",
+       y = "Valor") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# Filtrar dados para a role "JUNGLE"
+jungle_dados <- dados %>%
+  filter(Role == "JUNGLE") %>%
+  arrange(desc(Pick..)) %>%
+  head(10)
+
+# Resumir as estatísticas de tendência central
+tendencia_central_jungle <- jungle_dados %>%
+  select(Name, Win.., Role.., Pick.., Ban.., KDA) %>%
+  pivot_longer(cols = c(Win.., Role.., Pick.., Ban.., KDA), 
+               names_to = "Métrica", 
+               values_to = "Valor") %>%
+  group_by(Name, Métrica) %>%
+  summarise(Media = mean(Valor, na.rm = TRUE),
+            Mediana = median(Valor, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Media, Mediana), 
+               names_to = "Estatística", 
+               values_to = "Valor") 
+
+# Criar o gráfico com as métricas médias e medianas para os 10 campeões JUNGLE mais pickados
+ggplot(tendencia_central_jungle, aes(x = Name, y = Valor, fill = Estatística)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~ Métrica, scales = "free_y") +
+  labs(title = "Tendência Central dos 10 Campeões JUNGLE mais Pickados",
+       x = "Campeão",
+       y = "Valor") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# Filtrar dados para a role "MID"
+mid_dados <- dados %>%
+  filter(Role == "MID") %>%
+  arrange(desc(Pick..)) %>%
+  head(10)
+
+# Resumir as estatísticas de tendência central
+tendencia_central_mid <- mid_dados %>%
+  select(Name, Win.., Role.., Pick.., Ban.., KDA) %>%
+  pivot_longer(cols = c(Win.., Role.., Pick.., Ban.., KDA), 
+               names_to = "Métrica", 
+               values_to = "Valor") %>%
+  group_by(Name, Métrica) %>%
+  summarise(Media = mean(Valor, na.rm = TRUE),
+            Mediana = median(Valor, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Media, Mediana), 
+               names_to = "Estatística", 
+               values_to = "Valor") 
+
+# Criar o gráfico com as métricas médias e medianas para os 10 campeões MID mais pickados
+ggplot(tendencia_central_mid, aes(x = Name, y = Valor, fill = Estatística)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~ Métrica, scales = "free_y") +
+  labs(title = "Tendência Central dos 10 Campeões MID mais Pickados",
+       x = "Campeão",
+       y = "Valor") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# Filtrar dados para a role "ADC"
+adc_dados <- dados %>%
+  filter(Role == "ADC") %>%
+  arrange(desc(Pick..)) %>%
+  head(10)
+
+# Resumir as estatísticas de tendência central
+tendencia_central_adc <- adc_dados %>%
+  select(Name, Win.., Role.., Pick.., Ban.., KDA) %>%
+  pivot_longer(cols = c(Win.., Role.., Pick.., Ban.., KDA), 
+               names_to = "Métrica", 
+               values_to = "Valor") %>%
+  group_by(Name, Métrica) %>%
+  summarise(Media = mean(Valor, na.rm = TRUE),
+            Mediana = median(Valor, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Media, Mediana), 
+               names_to = "Estatística", 
+               values_to = "Valor") 
+
+# Criar o gráfico com as métricas médias e medianas para os 10 campeões ADC mais pickados
+ggplot(tendencia_central_adc, aes(x = Name, y = Valor, fill = Estatística)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~ Métrica, scales = "free_y") +
+  labs(title = "Tendência Central dos 10 Campeões ADC mais Pickados",
+       x = "Campeão",
+       y = "Valor") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# Filtrar dados para a role "SUPPORT"
+support_dados <- dados %>%
+  filter(Role == "SUPPORT") %>%
+  arrange(desc(Pick..)) %>%
+  head(10)
+
+# Resumir as estatísticas de tendência central
+tendencia_central_support <- support_dados %>%
+  select(Name, Win.., Role.., Pick.., Ban.., KDA) %>%
+  pivot_longer(cols = c(Win.., Role.., Pick.., Ban.., KDA), 
+               names_to = "Métrica", 
+               values_to = "Valor") %>%
+  group_by(Name, Métrica) %>%
+  summarise(Media = mean(Valor, na.rm = TRUE),
+            Mediana = median(Valor, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Media, Mediana), 
+               names_to = "Estatística", 
+               values_to = "Valor") 
+
+# Criar o gráfico com as métricas médias e medianas para os 10 campeões SUPPORT mais pickados
+ggplot(tendencia_central_support, aes(x = Name, y = Valor, fill = Estatística)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~ Métrica, scales = "free_y") +
+  labs(title = "Tendência Central dos 10 Campeões SUPPORT mais Pickados",
+       x = "Campeão",
+       y = "Valor") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Aqui nesta sessão o código visa analisar a tendência central das métricas de desempenho dos campeões mais escolhidos em diferentes roles.
+
+Visualização: Fornece uma visão clara das métricas médias e medianas, permitindo comparar a performance dos campeões dentro de cada role.
+
+Flexibilidade: A abordagem de filtragem e análise pode ser facilmente adaptada para outras roles ou métricas conforme necessário.
+
+Seguindo para análise estatística de ordem, fizemos uma análise de quais campeões são mais banidos por rota. Aqui fizemos um filtro por rota, analisando a taxa de banimento de cada campeão em sua rota, assim retornando um gráfico percentil e um gráfico quartil desta análise que pode ser visualizado abaixo.
+
+---
+title: "Análise Estatística dos Campeões TOP"
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+
+# Ler os dados do dataset usando read.csv
+file_path <- "C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv"
+dados <- read.csv(file_path, sep = ";", encoding = "UTF-8")
+
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(across(c(Win.., Role.., Pick.., Ban..), ~ as.numeric(gsub("%", "", .x)) / 100))
+
+# Filtrar os dados para a role TOP
+top_role <- filter(dados, Role == "TOP")
+```
+
+```{r}
+# Análise estatística de ordem para a coluna de banimentos dos campeões da role TOP
+
+# Ordenar os campeões por porcentagem de banimentos
+top_ban_sorted <- top_role %>%
+  arrange(desc(Ban..)) %>%
+  select(Name, Ban..)
+
+# Mostrar os dados ordenados
+top_ban_sorted
+
+```
+
+```{r}
+# Gráfico dos campeões TOP com mais banimentos
+
+ggplot(top_ban_sorted, aes(x = reorder(Name, Ban..), y = Ban..)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Top Campeoes por Percentual de Banimentos",
+    x = "Campeao",
+    y = "Porcentagem de Banimentos"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent)
+
+```
+
+```{r}
+# Exemplo de filtragem dos dados da role TOP e ordenação por banimentos
+top_ban_sorted <- dados %>%
+  filter(Role == "TOP") %>%
+  arrange(desc(Ban..))
+
+# Gráfico dos campeões TOP com mais banimentos
+ggplot(top_ban_sorted, aes(x = reorder(Name, Ban..), y = Ban..)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Top Campeoes por Percentual de Banimentos",
+    x = "Campeao",
+    y = "Porcentagem de Banimentos"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent)
+
+# Boxplot da distribuição de banimentos para campeões da role TOP
+ggplot(top_ban_sorted, aes(y = Ban..)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(
+    title = "Distribuicao de Banimentos dos Campeoes TOP",
+    y = "Porcentagem de Banimentos"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.title.x = element_blank())
+```
+
+```{r}
+# Filtrar os dados para a role JUNGLE
+jungle_role <- filter(dados, Role == "JUNGLE")
+```
+
+```{r}
+# Análise estatística de ordem para a coluna de banimentos dos campeões da role JUNGLE
+
+# Ordenar os campeões por porcentagem de banimentos
+jungle_ban_sorted <- jungle_role %>%
+  arrange(desc(Ban..)) %>%
+  select(Name, Ban..)
+
+# Mostrar os dados ordenados
+jungle_ban_sorted
+
+```
+
+```{r}
+# Boxplot da distribuição de banimentos para campeões da role JUNGLE
+ggplot(jungle_ban_sorted, aes(y = Ban..)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(
+    title = "Distribuicao de Banimentos dos Campeoes JUNGLE",
+    y = "Porcentagem de Banimentos"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.title.x = element_blank())
+
+```
+
+```{r}
+# Filtrar os dados para a role MID
+mid_role <- filter(dados, Role == "MID")
+```
+
+```{r}
+# Análise estatística de ordem para a coluna de banimentos dos campeões da role MID
+
+# Ordenar os campeões por porcentagem de banimentos
+mid_ban_sorted <- mid_role %>%
+  arrange(desc(Ban..)) %>%
+  select(Name, Ban..)
+
+# Mostrar os dados ordenados
+mid_ban_sorted
+
+```
+
+```{r}
+# Gráfico dos campeões MID com mais banimentos
+
+ggplot(mid_ban_sorted, aes(x = reorder(Name, Ban..), y = Ban..)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Top Campeoes por Percentual de Banimentos (MID)",
+    x = "Campeao",
+    y = "Porcentagem de Banimentos"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent)
+
+```
+
+```{r}
+# Boxplot da distribuição de banimentos para campeões da role MID
+ggplot(mid_ban_sorted, aes(y = Ban..)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(
+    title = "Distribuicao de Banimentos dos Campeoes MID",
+    y = "Porcentagem de Banimentos"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.title.x = element_blank())
+
+```
+
+```{r}
+# Filtrar os dados para a role ADC
+adc_role <- filter(dados, Role == "ADC")
+```
+
+```{r}
+# Análise estatística de ordem para a coluna de banimentos dos campeões da role ADC
+
+# Ordenar os campeões por porcentagem de banimentos
+adc_ban_sorted <- adc_role %>%
+  arrange(desc(Ban..)) %>%
+  select(Name, Ban..)
+
+# Mostrar os dados ordenados
+adc_ban_sorted
+
+```
+
+```{r}
+# Gráfico dos campeões ADC com mais banimentos
+
+ggplot(adc_ban_sorted, aes(x = reorder(Name, Ban..), y = Ban..)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Top Campeoes ADC por Percentual de Banimentos",
+    x = "Campeao",
+    y = "Porcentagem de Banimentos"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent)
+
+```
+
+```{r}
+# Boxplot da distribuição de banimentos para campeões da role ADC
+ggplot(adc_ban_sorted, aes(y = Ban..)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(
+    title = "Distribuicao de Banimentos dos Campeoes ADC",
+    y = "Porcentagem de Banimentos"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.title.x = element_blank())
+
+```
+
+```{r}
+# Filtrar os dados para a role Support
+support_role <- filter(dados, Role == "SUPPORT")
+```
+
+```{r}
+# Análise estatística de ordem para a coluna de banimentos dos campeões da role ADC
+
+# Ordenar os campeões por porcentagem de banimentos
+support_ban_sorted <- support_role %>%
+  arrange(desc(Ban..)) %>%
+  select(Name, Ban..)
+
+# Mostrar os dados ordenados
+support_ban_sorted
+
+```
+
+```{r}
+# Gráfico dos campeões Support com mais banimentos
+
+ggplot(support_ban_sorted, aes(x = reorder(Name, Ban..), y = Ban..)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Top Campeoes Support por Percentual de Banimentos",
+    x = "Campeao",
+    y = "Porcentagem de Banimentos"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent)
+
+```
+
+```{r}
+# Boxplot da distribuição de banimentos para campeões da role Support
+ggplot(support_ban_sorted, aes(y = Ban..)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(
+    title = "Distribuicao de Banimentos dos Campeoes Support",
+    y = "Porcentagem de Banimentos"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.title.x = element_blank())
+
+```
+
+---
+title: "Análise de Variação dos Dados por Role"
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+
+# Ler os dados do dataset usando read_csv2
+file_path <- "C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv"
+dados <- read_csv2(file_path)
+
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(across(ends_with("%"), ~ as.numeric(gsub("%", "", .x)) / 100))
+
+# Verificar se há valores ausentes
+cat("Valores Ausentes:\n")
+sapply(dados, function(x) sum(is.na(x)))
+```
+
+```{r}
+# Função para análise de variação por role
+analise_variacao <- function(dados, role) {
+  role_data <- dados %>%
+    filter(Role == role)
+  
+  cat("\n### Análise de Variação para Role:", role, "\n\n")
+  
+  # Resumo estatístico
+  cat("\n**Resumo Estatístico**\n")
+  print(summary(role_data))
+  
+  # Boxplot para Win %
+  ggplot(role_data, aes(x = Role, y = `Win %`)) +
+    geom_boxplot(fill = "lightblue") +
+    labs(title = paste("Variação de Win Rate para Role", role),
+         y = "Win Rate") +
+    theme_minimal()
+  
+  # Boxplot para Pick %
+  ggplot(role_data, aes(x = Role, y = `Pick %`)) +
+    geom_boxplot(fill = "lightgreen") +
+    labs(title = paste("Variação de Pick Rate para Role", role),
+         y = "Pick Rate") +
+    theme_minimal()
+  
+  # Boxplot para Ban %
+  ggplot(role_data, aes(x = Role, y = `Ban %`)) +
+    geom_boxplot(fill = "lightcoral") +
+    labs(title = paste("Variação de Ban Rate para Role", role),
+         y = "Ban Rate") +
+    theme_minimal()
+}
+
+# Aplicar a análise para cada role
+roles <- c("TOP", "JUNGLE", "MID", "ADC", "SUPPORT")
+for (role in roles) {
+  analise_variacao(dados, role)
+}
+
+```
+
+Nesta sessão visamos analisar a variação dos dados dos campeões por role, fornecendo um resumo estatístico e gráficos de boxplot para três métricas principais: taxa de vitória, taxa de seleção e taxa de banimento.
+
+Visualização: A função gera boxplots que ajudam a entender a distribuição e a variabilidade das métricas para cada role, oferecendo uma visão clara sobre a dispersão dos dados.
+
+Flexibilidade: A função pode ser reutilizada para qualquer role presente no dataset, o que permite uma análise consistente e comparativa entre as diferentes roles.
+
+---
+title: "Análise de Valores Atípicos nas Roles"
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+
+# Ler os dados do dataset
+file_path <- "C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv"
+dados <- read_delim(file_path, delim = ";", locale = locale(decimal_mark = ",", grouping_mark = "."))
+
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(across(c(`Win %`, `Role %`, `Pick %`, `Ban %`), ~ as.numeric(gsub("%", "", .x)) / 100))
+```
+
+```{r}
+# Função para criar boxplots por role
+create_boxplot <- function(role_name, variable) {
+  role_data <- dados %>%
+    filter(Role == role_name)
+
+  ggplot(role_data, aes_string(y = paste0("`", variable, "`"))) +
+    geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.size = 2) +
+    labs(
+      title = paste("Análise de Valores Atípicos para a Role", role_name),
+      y = paste("Porcentagem de", variable)
+    ) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(axis.title.x = element_blank())
+}
+
+# Roles para analisar
+roles <- c("TOP", "JUNGLE", "MID", "ADC", "SUPPORT")
+
+# Variáveis para analisar
+variables <- c("Win %", "Pick %", "Ban %")
+
+# Criar boxplots para cada role e variável
+for (role in roles) {
+  for (variable in variables) {
+    print(create_boxplot(role, variable))
+  }
+}
+
+```
+
+Análise de Código: Identificação de Valores Atípicos por Role
+
+Aqui temos como objetivo realizar uma análise de valores atípicos (outliers) para diferentes roles de campeões no jogo League of Legends. A análise se concentra nas variáveis percentuais de vitória (Win %), escolha (Pick %) e banimento (Ban %) para cada role (TOP, JUNGLE, MID, ADC, SUPPORT). A identificação de valores atípicos é crucial para entender se há campeões que se destacam de forma anormal em relação aos outros, o que pode indicar desequilíbrios ou características únicas.
+
+-   Leitura e Preparação dos Dados
+
+O código começa com a leitura do dataset, que contém informações estatísticas sobre campeões de League of Legends. A leitura é feita usando read_delim, especificando o delimitador como ponto e vírgula (;), o que é comum em arquivos CSV com formatação regional europeia. Além disso, o código especifica que o símbolo de vírgula é usado como separador decimal.
+
+Após a leitura, as colunas que contêm porcentagens (Win %, Role %, Pick %, Ban %) são convertidas de strings que representam porcentagens para valores numéricos decimais, facilitando a criação dos gráficos.
+
+```         
+A leitura correta dos dados e a conversão das colunas de porcentagem são etapas fundamentais para garantir que os gráficos gerados representem com precisão os valores reais.
+O uso de across() facilita a aplicação da mesma transformação a múltiplas colunas, tornando o código mais eficiente e legível.
+```
+
+-   Criação de Boxplots para Análise de Valores Atípicos
+
+O núcleo da análise é a criação de boxplots, que são usados para identificar valores atípicos. Um boxplot mostra a distribuição de uma variável e destaca os outliers, que são pontos de dados que estão fora do intervalo interquartil (IQR).
+
+```         
+A função create_boxplot é parametrizada para aceitar o nome de uma role e uma variável específica (como Win %, Pick %, ou Ban %), permitindo a geração de gráficos específicos para cada combinação.
+O uso de geom_boxplot() no ggplot2 facilita a visualização dos outliers, com os pontos fora do IQR destacados em vermelho, tornando fácil identificar campeões que fogem do padrão comum.
+A escala y é ajustada para exibir valores em forma de porcentagem, melhorando a interpretação dos resultados.
+```
+
+-   Iteração Sobre Roles e Variáveis
+
+Para cada role e para cada variável (Win %, Pick %, Ban %), o código itera sobre as combinações possíveis, gerando e exibindo os boxplots.
+
+```         
+Essa abordagem iterativa permite uma análise completa e sistemática dos dados, garantindo que nenhuma combinação de role e variável seja omitida.
+O uso de loops torna o código mais compacto e escalável, facilitando a geração automática de múltiplos gráficos.
+```
+
+O código faz uma análise detalhada e sistemática dos valores atípicos para diferentes roles em League of Legends, focando nas porcentagens de vitória, escolha e banimento. A utilização de boxplots permite uma visualização clara e eficaz desses outliers, que podem indicar campeões que desempenham significativamente melhor ou pior que a média, ou que são escolhidos ou banidos de forma desproporcional.
+
+Identificar esses valores atípicos pode ser extremamente valioso para ajustes no equilíbrio do jogo, bem como para a definição de estratégias competitivas. Por exemplo, um campeão com uma alta taxa de vitória, mas que é raramente escolhido, pode ser um “segredo bem guardado” que poderia ser explorado. Por outro lado, campeões com alta taxa de banimento, mas com uma baixa taxa de vitória, podem sugerir uma percepção errada sobre sua eficácia real.
+
+---
+title: "Análise Estatística da distribuicao dos Dados - Role TOP"
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyr)
+
+# Ler os dados do dataset usando read_csv2
+file_path <- "C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv"
+dados <- read_csv2(file_path, locale = locale(encoding = "UTF-8"))
+
+# Mostrar a estrutura dos dados para verificação
+str(dados)
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role TOP
+top_role <- dados %>% filter(Role == "TOP")
+```
+
+```{r}
+# Filtrar os dados para a role TOP
+top_role <- filter(dados, Role == "TOP")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- top_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+```
+
+```{r}
+# Análise estatística da distribuição para os 10 campeões com mais picks na role TOP
+top_10_picks_summary <- top_10_picks %>%
+  summarise(across(c(`Win %`, `Role %`, `Pick %`, `Ban %`), list(Min = ~ min(.x, na.rm = TRUE),
+                                                                  Max = ~ max(.x, na.rm = TRUE),
+                                                                  Mean = ~ mean(.x, na.rm = TRUE),
+                                                                  SD = ~ sd(.x, na.rm = TRUE))))
+
+# Mostrar a tabela com as estatísticas descritivas
+top_10_picks_summary
+
+```
+
+```{r}
+# Gráficos de distribuição para os 10 campeões com mais picks na role TOP
+ggplot(top_10_picks, aes(x = `Win %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Vitórias dos 10 Campeões com Mais Picks (TOP)",
+       x = "Porcentagem de Vitórias",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Role %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Role dos 10 Campeões com Mais Picks (TOP)",
+       x = "Porcentagem de Role",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Pick %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Picks dos 10 Campeões com Mais Picks (TOP)",
+       x = "Porcentagem de Picks",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Ban %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Banimentos dos 10 Campeões com Mais Picks (TOP)",
+       x = "Porcentagem de Banimentos",
+       y = "Contagem") +
+  theme_minimal()
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role ADC
+adc_role <- dados %>% filter(Role == "ADC")
+```
+
+```{r}
+# Filtrar os dados para a role ADC
+adc_role <- filter(dados, Role == "ADC")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- adc_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+```
+
+```{r}
+# Análise estatística da distribuição para os 10 campeões com mais picks na role ADC
+top_10_picks_summary <- top_10_picks %>%
+  summarise(across(c(`Win %`, `Role %`, `Pick %`, `Ban %`), list(Min = ~ min(.x, na.rm = TRUE),
+                                                                  Max = ~ max(.x, na.rm = TRUE),
+                                                                  Mean = ~ mean(.x, na.rm = TRUE),
+                                                                  SD = ~ sd(.x, na.rm = TRUE))))
+
+# Mostrar a tabela com as estatísticas descritivas
+top_10_picks_summary
+
+```
+
+```{r}
+# Gráficos de distribuição para os 10 campeões com mais picks na role ADC
+ggplot(top_10_picks, aes(x = `Win %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Vitórias dos 10 Campeões com Mais Picks (ADC)",
+       x = "Porcentagem de Vitórias",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Role %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Role dos 10 Campeões com Mais Picks (ADC)",
+       x = "Porcentagem de Role",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Pick %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Picks dos 10 Campeões com Mais Picks (ADC)",
+       x = "Porcentagem de Picks",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Ban %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Banimentos dos 10 Campeões com Mais Picks (ADC)",
+       x = "Porcentagem de Banimentos",
+       y = "Contagem") +
+  theme_minimal()
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role MID
+mid_role <- dados %>% filter(Role == "MID")
+```
+
+```{r}
+# Filtrar os dados para a role MID
+mid_role <- filter(dados, Role == "MID")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- mid_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+```
+
+```{r}
+# Análise estatística da variação para os 10 campeões com mais picks na role MID
+top_10_picks_summary <- top_10_picks %>%
+  summarise(across(c(`Win %`, `Role %`, `Pick %`, `Ban %`), list(Min = ~ min(.x, na.rm = TRUE),
+                                                                  Max = ~ max(.x, na.rm = TRUE),
+                                                                  Mean = ~ mean(.x, na.rm = TRUE),
+                                                                  SD = ~ sd(.x, na.rm = TRUE))))
+
+# Mostrar a tabela com as estatísticas descritivas
+top_10_picks_summary
+
+```
+
+```{r}
+# Gráficos de distribuição para os 10 campeões com mais picks na role MID
+ggplot(top_10_picks, aes(x = `Win %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Vitórias dos 10 Campeões com Mais Picks (MID)",
+       x = "Porcentagem de Vitórias",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Role %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Role dos 10 Campeões com Mais Picks (MID)",
+       x = "Porcentagem de Role",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Pick %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Picks dos 10 Campeões com Mais Picks (MID)",
+       x = "Porcentagem de Picks",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Ban %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Banimentos dos 10 Campeões com Mais Picks (MID)",
+       x = "Porcentagem de Banimentos",
+       y = "Contagem") +
+  theme_minimal()
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role JUNGLE
+jungle_role <- dados %>% filter(Role == "JUNGLE")
+```
+
+```{r}
+# Filtrar os dados para a role JUNGLE
+jungle_role <- filter(dados, Role == "JUNGLE")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- jungle_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+```
+
+```{r}
+# Análise estatística da variação para os 10 campeões com mais picks na role JUNGLE
+top_10_picks_summary <- top_10_picks %>%
+  summarise(across(c(`Win %`, `Role %`, `Pick %`, `Ban %`), list(Min = ~ min(.x, na.rm = TRUE),
+                                                                  Max = ~ max(.x, na.rm = TRUE),
+                                                                  Mean = ~ mean(.x, na.rm = TRUE),
+                                                                  SD = ~ sd(.x, na.rm = TRUE))))
+
+# Mostrar a tabela com as estatísticas descritivas
+top_10_picks_summary
+```
+
+```{r}
+# Gráficos de distribuição para os 10 campeões com mais picks na role JUNGLE
+ggplot(top_10_picks, aes(x = `Win %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Vitórias dos 10 Campeões com Mais Picks (JUNGLE)",
+       x = "Porcentagem de Vitórias",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Role %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Role dos 10 Campeões com Mais Picks (JUNGLE)",
+       x = "Porcentagem de Role",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Pick %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Picks dos 10 Campeões com Mais Picks (JUNGLE)",
+       x = "Porcentagem de Picks",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Ban %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Banimentos dos 10 Campeões com Mais Picks (JUNGLE)",
+       x = "Porcentagem de Banimentos",
+       y = "Contagem") +
+  theme_minimal()
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role SUPPORT
+support_role <- dados %>% filter(Role == "SUPPORT")
+```
+
+```{r}
+# Filtrar os dados para a role SUPPORT
+support_role <- filter(dados, Role == "SUPPORT")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- support_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+```
+
+```{r}
+# Análise estatística da variação para os 10 campeões com mais picks na role SUPPORT
+top_10_picks_summary <- top_10_picks %>%
+  summarise(across(c(`Win %`, `Role %`, `Pick %`, `Ban %`), list(Min = ~ min(.x, na.rm = TRUE),
+                                                                  Max = ~ max(.x, na.rm = TRUE),
+                                                                  Mean = ~ mean(.x, na.rm = TRUE),
+                                                                  SD = ~ sd(.x, na.rm = TRUE))))
+
+# Mostrar a tabela com as estatísticas descritivas
+top_10_picks_summary
+```
+
+```{r}
+# Gráficos de distribuição para os 10 campeões com mais picks na role SUPPORT
+ggplot(top_10_picks, aes(x = `Win %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Vitórias dos 10 Campeões com Mais Picks (SUPPORT)",
+       x = "Porcentagem de Vitórias",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Role %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Role dos 10 Campeões com Mais Picks (SUPPORT)",
+       x = "Porcentagem de Role",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Pick %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Picks dos 10 Campeões com Mais Picks (SUPPORT)",
+       x = "Porcentagem de Picks",
+       y = "Contagem") +
+  theme_minimal()
+
+ggplot(top_10_picks, aes(x = `Ban %`)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribuição da Porcentagem de Banimentos dos 10 Campeões com Mais Picks (SUPPORT)",
+       x = "Porcentagem de Banimentos",
+       y = "Contagem") +
+  theme_minimal()
+
+```
+
+Aqui criamos um código que realiza uma análise estatística detalhada da distribuição dos dados para diferentes roles em um dataset de campeões de League of Legends.
+
+O código fornece uma análise da distribuição dos dados dos campeões de League of Legends, focando nas top 10 opções para diferentes roles e gerando estatísticas descritivas e gráficos para visualizar a variação das porcentagens de vitórias, role, picks e banimentos.
+
+---
+"Análise de Correlações dos 10 Campeões com Mais Picks - Role TOP"
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(corrplot)
+
+# Ler os dados do dataset usando read_csv2
+file_path <- "C:/Users/nasta/Documents/Estatistica/Av3/League_of_Legends_Champion_Stats_13.13.csv"
+dados <- read_csv2(file_path, locale = locale(encoding = "UTF-8"))
+
+# Mostrar a estrutura dos dados para verificação
+str(dados)
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role TOP
+top_role <- dados %>% filter(Role == "TOP")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- top_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+
+```
+
+```{r}
+# Selecionar as colunas quantitativas para análise de correlação
+top_10_picks_numeric <- top_10_picks %>%
+  select(`Win %`, `Role %`, `Pick %`, `Ban %`)
+
+# Calcular a matriz de correlação
+correlation_matrix <- cor(top_10_picks_numeric, use = "complete.obs")
+
+# Exibir a matriz de correlação
+correlation_matrix
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role JUNGLE
+jungle_role <- dados %>% filter(Role == "JUNGLE")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- jungle_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+
+```
+
+```{r}
+# Selecionar as colunas quantitativas para análise de correlação
+top_10_picks_numeric <- top_10_picks %>%
+  select(`Win %`, `Role %`, `Pick %`, `Ban %`)
+
+# Calcular a matriz de correlação
+correlation_matrix <- cor(top_10_picks_numeric, use = "complete.obs")
+
+# Exibir a matriz de correlação
+correlation_matrix
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role MID
+mid_role <- dados %>% filter(Role == "MID")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- mid_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+
+```
+
+```{r}
+# Selecionar as colunas quantitativas para análise de correlação
+top_10_picks_numeric <- top_10_picks %>%
+  select(`Win %`, `Role %`, `Pick %`, `Ban %`)
+
+# Calcular a matriz de correlação
+correlation_matrix <- cor(top_10_picks_numeric, use = "complete.obs")
+
+# Exibir a matriz de correlação
+correlation_matrix
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role ADC
+adc_role <- dados %>% filter(Role == "ADC")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- adc_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+
+```
+
+```{r}
+# Selecionar as colunas quantitativas para análise de correlação
+top_10_picks_numeric <- top_10_picks %>%
+  select(`Win %`, `Role %`, `Pick %`, `Ban %`)
+
+# Calcular a matriz de correlação
+correlation_matrix <- cor(top_10_picks_numeric, use = "complete.obs")
+
+# Exibir a matriz de correlação
+correlation_matrix
+
+```
+
+```{r}
+# Converter colunas com porcentagens para valores numéricos
+dados <- dados %>%
+  mutate(
+    `Win %` = as.numeric(gsub("%", "", `Win %`)) / 100,
+    `Role %` = as.numeric(gsub("%", "", `Role %`)) / 100,
+    `Pick %` = as.numeric(gsub("%", "", `Pick %`)) / 100,
+    `Ban %` = as.numeric(gsub("%", "", `Ban %`)) / 100
+  )
+
+# Filtrar os dados para a role SUPPORT
+support_role <- dados %>% filter(Role == "SUPPORT")
+
+# Selecionar os 10 campeões com mais picks
+top_10_picks <- support_role %>%
+  arrange(desc(`Pick %`)) %>%
+  slice_head(n = 10)
+
+# Exibir as primeiras linhas dos dados dos 10 campeões com mais picks
+top_10_picks
+
+```
+
+```{r}
+# Selecionar as colunas quantitativas para análise de correlação
+top_10_picks_numeric <- top_10_picks %>%
+  select(`Win %`, `Role %`, `Pick %`, `Ban %`)
+
+# Calcular a matriz de correlação
+correlation_matrix <- cor(top_10_picks_numeric, use = "complete.obs")
+
+# Exibir a matriz de correlação
+correlation_matrix
+
+```
+
+Análise de Código: Correlação dos 10 Campeões com Mais Picks por Role
+
+Este código foi projetado para realizar uma análise de correlação entre as variáveis percentuais (Win %, Role %, Pick %, Ban %) para os 10 campeões mais escolhidos em diferentes roles no jogo League of Legends. As roles analisadas incluem TOP, JUNGLE, MID, ADC e SUPPORT. A análise de correlação é útil para entender como essas variáveis se relacionam entre si, especialmente quando se trata de campeões populares em cada role.
+
+-   Conversão de Colunas Percentuais para Valores Numéricos
+
+A primeira parte do código trata da conversão das colunas de porcentagens (Win %, Role %, Pick %, Ban %) em valores numéricos. Isso é essencial para permitir operações matemáticas e estatísticas precisas nas etapas subsequentes. A conversão é feita removendo o símbolo de porcentagem e dividindo por 100, transformando as porcentagens em frações decimais.
+
+```         
+Esta etapa é fundamental, pois garante que os dados estejam em um formato adequado para as análises estatísticas que seguem. Sem essa conversão, as funções como cor() (que calcula a correlação) não poderiam ser aplicadas corretamente.
+```
+
+-   Filtragem por Role e Seleção dos 10 Campeões com Mais Picks
+
+Para cada role (TOP, JUNGLE, MID, ADC, SUPPORT), o código filtra os dados para incluir apenas os campeões daquela role específica. Em seguida, seleciona os 10 campeões com o maior percentual de picks. Esta seleção é feita ordenando os campeões de acordo com Pick % e pegando os 10 primeiros.
+
+```         
+Filtrar os dados por role é crucial para garantir que a análise de correlação reflita as características específicas de cada posição no jogo.
+Selecionar os 10 campeões mais escolhidos permite focar a análise em personagens que têm maior impacto no jogo devido à sua popularidade.
+```
+
+-   Cálculo da Matriz de Correlação
+
+Após selecionar os 10 campeões com mais picks em cada role, o código calcula uma matriz de correlação para as variáveis Win %, Role %, Pick %, Ban %. A correlação entre essas variáveis é calculada usando a função cor().
+
+```         
+A matriz de correlação revela a força e a direção das relações lineares entre as variáveis selecionadas.
+Por exemplo, uma correlação alta entre Pick % e Win % sugeriria que campeões mais escolhidos tendem a ter maiores taxas de vitória, o que pode indicar que são considerados campeões fortes ou “meta”.
+Inversamente, uma correlação negativa entre Pick % e Ban % poderia indicar que campeões mais escolhidos são menos banidos, possivelmente porque não são considerados ameaças no jogo competitivo.
+```
+
+-   Repetição do Processo para Outras Roles
+
+O código repete o processo descrito acima para as outras roles (JUNGLE, MID, ADC, SUPPORT), garantindo que a análise de correlação seja realizada para todas as principais posições no jogo.
+
+```         
+Repetir o processo para cada role permite uma análise comparativa. As correlações podem variar significativamente entre roles, refletindo diferenças nas dinâmicas de jogo e nas estratégias associadas a cada posição.
+Por exemplo, campeões na role JUNGLE podem mostrar correlações diferentes entre Pick % e Ban % comparados a campeões na role MID, devido à importância estratégica dessas posições no jogo.
+```
+
+Este código fornece uma análise detalhada e focada em como diferentes variáveis percentuais estão correlacionadas para os campeões mais escolhidos em cada role do League of Legends. Ao converter os dados em um formato apropriado, filtrar por role e calcular as correlações, o código oferece insights valiosos sobre a relação entre popularidade (Pick %), sucesso (Win %), relevância no jogo (Role %), e ameaça percebida (Ban %).
+
+Essas análises são úteis para jogadores e analistas que desejam entender melhor as dinâmicas do jogo, identificando quais campeões são dominantes em cada role e como suas estatísticas interagem. Esses insights podem ser usados para informar estratégias de jogo, como quais campeões escolher ou banir em partidas competitivas.
